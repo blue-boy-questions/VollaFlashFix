@@ -59,9 +59,19 @@ public class FlashDimHook implements IXposedHookLoadPackage {
         XposedBridge.log("VollaFlashFix: loaded into " + pkg);
 
         hookCharacteristicsStrength(lpparam);
-        hookGetTorchStrengthLevel(lpparam);
-        hookTurnOnTorchWithStrengthLevel(lpparam);
-        hookSetTorchMode(lpparam);
+
+        // Public CameraManager API. FlashDim calls torch through here.
+        hookGetTorchStrengthLevel(lpparam, "android.hardware.camera2.CameraManager");
+        hookTurnOnTorchWithStrengthLevel(lpparam, "android.hardware.camera2.CameraManager");
+        hookSetTorchMode(lpparam, "android.hardware.camera2.CameraManager");
+
+        // Internal singleton. SystemUI's FlashlightController drives the torch
+        // through CameraManagerGlobal directly, bypassing the public wrapper,
+        // so we must hook it here too or the system flashlight tile takes the
+        // stock single-LED HAL path.
+        hookGetTorchStrengthLevel(lpparam, "android.hardware.camera2.CameraManager$CameraManagerGlobal");
+        hookTurnOnTorchWithStrengthLevel(lpparam, "android.hardware.camera2.CameraManager$CameraManagerGlobal");
+        hookSetTorchMode(lpparam, "android.hardware.camera2.CameraManager$CameraManagerGlobal");
     }
 
     /**
@@ -96,10 +106,10 @@ public class FlashDimHook implements IXposedHookLoadPackage {
      * Report the current level. We return our cached value so the UI slider
      * position stays consistent with what we actually wrote to the kernel.
      */
-    private void hookGetTorchStrengthLevel(LoadPackageParam lpparam) {
+    private void hookGetTorchStrengthLevel(LoadPackageParam lpparam, String className) {
         try {
             XposedHelpers.findAndHookMethod(
-                "android.hardware.camera2.CameraManager", lpparam.classLoader,
+                className, lpparam.classLoader,
                 "getTorchStrengthLevel", String.class,
                 new XC_MethodReplacement() {
                     @Override
@@ -107,8 +117,9 @@ public class FlashDimHook implements IXposedHookLoadPackage {
                         return sLastLevel;
                     }
                 });
+            XposedBridge.log("VollaFlashFix: hooked getTorchStrengthLevel on " + className);
         } catch (Throwable t) {
-            XposedBridge.log("VollaFlashFix: getTorchStrengthLevel hook failed: " + t);
+            XposedBridge.log("VollaFlashFix: getTorchStrengthLevel hook skipped on " + className + ": " + t);
         }
     }
 
@@ -116,10 +127,10 @@ public class FlashDimHook implements IXposedHookLoadPackage {
      * The strength-aware torch entry point. Clamp the requested level and
      * drive BOTH LED channels directly.
      */
-    private void hookTurnOnTorchWithStrengthLevel(LoadPackageParam lpparam) {
+    private void hookTurnOnTorchWithStrengthLevel(LoadPackageParam lpparam, String className) {
         try {
             XposedHelpers.findAndHookMethod(
-                "android.hardware.camera2.CameraManager", lpparam.classLoader,
+                className, lpparam.classLoader,
                 "turnOnTorchWithStrengthLevel", String.class, int.class,
                 new XC_MethodReplacement() {
                     @Override
@@ -132,8 +143,9 @@ public class FlashDimHook implements IXposedHookLoadPackage {
                         return null;
                     }
                 });
+            XposedBridge.log("VollaFlashFix: hooked turnOnTorchWithStrengthLevel on " + className);
         } catch (Throwable t) {
-            XposedBridge.log("VollaFlashFix: turnOnTorchWithStrengthLevel hook failed: " + t);
+            XposedBridge.log("VollaFlashFix: turnOnTorchWithStrengthLevel hook skipped on " + className + ": " + t);
         }
     }
 
@@ -142,10 +154,10 @@ public class FlashDimHook implements IXposedHookLoadPackage {
      * Off -> zero both channels. We fully replace the method so the broken
      * single-channel HAL path is never taken.
      */
-    private void hookSetTorchMode(LoadPackageParam lpparam) {
+    private void hookSetTorchMode(LoadPackageParam lpparam, String className) {
         try {
             XposedHelpers.findAndHookMethod(
-                "android.hardware.camera2.CameraManager", lpparam.classLoader,
+                className, lpparam.classLoader,
                 "setTorchMode", String.class, boolean.class,
                 new XC_MethodReplacement() {
                     @Override
@@ -155,8 +167,9 @@ public class FlashDimHook implements IXposedHookLoadPackage {
                         return null;
                     }
                 });
+            XposedBridge.log("VollaFlashFix: hooked setTorchMode on " + className);
         } catch (Throwable t) {
-            XposedBridge.log("VollaFlashFix: setTorchMode hook failed: " + t);
+            XposedBridge.log("VollaFlashFix: setTorchMode hook skipped on " + className + ": " + t);
         }
     }
 
