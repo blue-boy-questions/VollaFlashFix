@@ -10,8 +10,31 @@ android {
         applicationId "com.mmggh.vollaflashfix"
         minSdk 33
         targetSdk 34
-        versionCode 3
-        versionName "2.1"
+        versionCode 4
+        versionName "2.2"
+    }
+
+    // Fixed signing key committed to the repo so every CI build produces an
+    // APK with the SAME signature. This lets you install updates over a
+    // previous version without uninstalling first. This is a throwaway
+    // distribution key for a personal tool, not a security-sensitive secret.
+    signingConfigs {
+        release {
+            storeFile file('vollaflashfix.keystore')
+            storePassword 'android'
+            keyAlias 'vollakey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
     }
 
     compileOptions {

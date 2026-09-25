@@ -12,6 +12,7 @@ captures/
 # OS
 .DS_Store
 
-# Keystore / secrets
+# Keystore / secrets — but keep the committed CI signing key
 *.jks
 *.keystore
+!app/vollaflashfix.keystore
